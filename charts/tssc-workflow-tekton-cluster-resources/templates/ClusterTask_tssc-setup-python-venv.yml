@@ -1,0 +1,229 @@
+apiVersion: tekton.dev/v1beta1
+kind: ClusterTask
+metadata:
+  name: tssc-setup-python-venv
+  labels:
+    {{- include "tssc-workflow-tekton-cluster-resources.labels" . | nindent 4 }}
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.14.0"
+    tekton.dev/tags: tssc,python,venv,pip
+    tekton.dev/displayName: TSSC Setup Python Virtual Environment
+spec:
+  description: >-
+    Sets up a Python virtual environment with the TSSC step runner library in the given home
+    workspace.
+  workspaces:
+  - name: home
+    mountPath: /home/tssc
+    description: >-
+      Workspace for the container users home directory.
+
+      Important because the home directory is where the python virtual environment will be setup
+      to be shared with future steps.
+  params:
+  - name: verbose
+    description: log the commands used during execution
+    type: string
+    default: "false"
+  - name: image
+    type: string
+    description: >-
+      Container image to run the steps of this task in.
+    default: tssc/tssc-base:latest
+  # NOTE: See https://github.com/tektoncd/pipeline/issues/3423
+  #- name: imagePullPolicy
+  #  type: string
+  #  description: >-
+  #    Policy for pulling new versions of the given image.
+  #  default: IfNotPresent
+  - name: updateTSSCLibrary
+    type: string
+    description: >-
+      If 'true', then pull the TSSC step runner library source code and build it.
+      If 'false', use the version of the TSSC step runner library that is pre-installed
+      in the CI worker images.
+
+      If 'false' then the following parameters are ignored:
+        - 'tsscLibSourceUrl'
+        - 'tsscLibIndexUrl'
+        - 'tsscLibExtraIndexUrl'
+        - 'tsscLibVersion'
+    default: "false"
+  - name: tsscLibIndexUrl
+    type: string
+    description: >-
+      If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+      will be passed to pip as '--index-url' for installing the TSSC step runner library
+      and its dependencies.
+
+      NOTE
+      ----
+      PIP is indeterminate whether it will pull packages from '--index-url' or
+      '--extra-index-url', therefor be sure to specify 'tsscLibVersion'
+      if trying to pull a specific version from a specific index.
+
+      SEE
+      ---
+      - https://pip.pypa.io/en/stable/reference/pip_install/#id48
+    default: "https://pypi.org/simple/"
+  - name: tsscLibExtraIndexUrl
+    type: string
+    description: >-
+      If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+      will be passed to pip as '--extra-index-url' for installing the TSSC step runner library
+      and its dependencies.
+
+      NOTE
+      ----
+      PIP is indeterminate whether it will pull packages from '--index-url' or
+      '--extra-index-url', therefor be sure to specify 'tsscLibVersion'
+      if trying to pull a specific version from a specific index.
+
+      SEE
+      ---
+      - https://pip.pypa.io/en/stable/reference/pip_install/#id48
+    default: "https://pypi.org/simple/"
+  - name: tsscLibVersion
+    type: string
+    description: >-
+      If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+      will be passed to pip as as the version of the TSSC step runner library to install.
+
+      NOTE
+      ----
+      If not given pip will isntall the latest from either 'tsscLibIndexUrl' or
+      'tsscLibExtraIndexUrl' indeterminantly.
+    default: ""
+  - name: tsscLibSourceUrl
+    type: string
+    description: >-
+      If none empty value given and 'updateTSSCLibrary' is true this will be used as the source
+      location to install the TSSC step runner library from rather then from a PEP 503 compliant
+      repository.
+
+      If given then the following parameters are ignored:
+        - 'tsscLibIndexUrl'
+        - 'tsscLibExtraIndexUrl'
+        - 'tsscLibVersion'
+
+      EXAMPLES
+      --------
+      git+https://github.com/rhtconsulting/tssc-python-package.git@feature/NAPSSPO-1018
+      installs from the public 'rhtconsulting' fork from the 'feature/NAPSSPO-1018' branch.
+
+      git+https://gitea.internal.example.xyz/tools/tssc-python-package.git@main
+      installs from an internal fork of the 'tssc' library from the 'main' branch.
+    default: ""
+  - name: venvName
+    type: string
+    description: >-
+      Name of the virtual environment to set up in the given home worksapce.
+    default: "tssc"
+
+  results:
+  - name: venvPath
+    description: >-
+      Path to the setup python virtual environment.
+
+  steps:
+  - name: create-python-venv
+    image: $(params.image)
+    # NOTE:
+    #   when https://github.com/tektoncd/pipeline/issues/3423 resolved
+    #   replace with $(params.imagePullPolicy)
+    imagePullPolicy: {{ $.Values.imagePullPolicy }}
+    {{- if $.Values.runAsUser }}
+    securityContext:
+      runAsUser: {{ $.Values.runAsUser | int }}
+    {{- end }}
+    env:
+    - name: HOME
+      value: $(workspaces.home.path)
+    - name: VENV_NAME
+      value: $(params.venvName)
+    workingDir: $(workspaces.home.path)
+    script: |
+      #!/bin/sh
+
+      echo "**********************"
+      echo "* Create Python venv *"
+      echo "**********************"
+      python -m venv --system-site-packages --copies ${HOME}/${VENV_NAME}
+
+  - name: install-tssc-python-library
+    image: $(params.image)
+    # NOTE:
+    #   when https://github.com/tektoncd/pipeline/issues/3423 resolved
+    #   replace with $(params.imagePullPolicy)
+    imagePullPolicy: {{ $.Values.imagePullPolicy }}
+    {{- if $.Values.runAsUser }}
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: {{ $.Values.runAsUser | int }}
+    {{- end }}
+    env:
+    - name: HOME
+      value: $(workspaces.home.path)
+    - name: UPDATE_TSSC_LIBRARY
+      value: $(params.updateTSSCLibrary)
+    - name: TSSC_LIB_SOURCE_URL
+      value: $(params.tsscLibSourceUrl)
+    - name: TSSC_LIB_INDEX_URL
+      value: $(params.tsscLibIndexUrl)
+    - name: TSSC_LIB_EXTRA_INDEX_URL
+      value: $(params.tsscLibExtraIndexUrl)
+    - name: TSSC_LIB_VERSION
+      value: $(params.tsscLibVersion)
+    - name: VENV_NAME
+      value: $(params.venvName)
+    - name: VERBOSE
+      value: $(params.verbose)
+    script: |
+      #!/bin/sh
+      if [ "${VERBOSE}" == "true" ]; then set -x; else set +x; fi
+      set -eu -o pipefail
+
+      if [[ ${UPDATE_TSSC_LIBRARY} =~ true|True ]]; then
+        echo "*********************"
+        echo "* Update Python Pip *"
+        echo "*********************"
+
+        source ${HOME}/${VENV_NAME}/bin/activate
+        python -m pip install --upgrade pip
+
+        if [[ ${TSSC_LIB_SOURCE_URL} ]]; then
+          TSSC_LIB_INSTALL_CMD="python -m pip install --upgrade ${TSSC_LIB_SOURCE_URL}"
+        else
+          indexUrlFlag=""
+
+          if [[ ${TSSC_LIB_INDEX_URL} ]]; then
+            indexUrlFlag="--index-url ${TSSC_LIB_INDEX_URL}"
+          fi
+
+          extraIndexUrlFlag=""
+          if [[ ${TSSC_LIB_EXTRA_INDEX_URL} ]]; then
+            extraIndexUrlFlag="--extra-index-url  ${TSSC_LIB_EXTRA_INDEX_URL}"
+          fi
+
+          TSSC_LIB_INSTALL_CMD="python -m pip install --upgrade ${TSSC_LIB_INDEX_URL} ${TSSC_LIB_EXTRA_INDEX_URL} tssc"
+
+          if [[ ${TSSC_LIB_VERSION} ]]; then
+            TSSC_LIB_INSTALL_CMD+="==${TSSC_LIB_VERSION}"
+          fi
+        fi
+
+        echo "******************************"
+        echo "* Update TSSC Python Package *"
+        echo "******************************"
+        ${TSSC_LIB_INSTALL_CMD}
+      else
+        echo "Using pre-installed TSSC step runner library"
+      fi
+
+      echo "*********************************************"
+      echo "* Installed TSSC Python Package Information *"
+      echo "*********************************************"
+      python -m pip show tssc
+
+      # return results
+      echo -n "$HOME/$(params.venvName)" > $(results.venvPath.path)

@@ -1,0 +1,26 @@
+{{- if and $.Values.rbacCreate $.Values.runAsUser -}}
+---
+kind: SecurityContextConstraints
+apiVersion: security.openshift.io/v1
+metadata:
+  name: {{ include "tssc-workflow-tekton-cluster-resources.sccName" . }}
+  labels:
+    {{- include "tssc-workflow-tekton-cluster-resources.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/description: Allows for runAsUser as UID {{ $.Values.runAsUser }}
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+readOnlyRootFilesystem: false
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMax: {{ $.Values.runAsUser | int }}
+  uidRangeMin: {{ $.Values.runAsUser | int }}
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+{{- end }}

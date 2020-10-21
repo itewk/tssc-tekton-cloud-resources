@@ -1,0 +1,107 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: ClusterTask
+metadata:
+  name: tssc-step-runner
+  labels:
+    {{- include "tssc-workflow-tekton-cluster-resources.labels" . | nindent 4 }}
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.14.0"
+    tekton.dev/tags: tssc,python
+    tekton.dev/displayName: TSSC Step Runner
+spec:
+  description: >-
+    Runs a given TSSC step using the TSSC step runner library using the given TSSC configuration
+    against an optional environment.
+  workspaces:
+  - name: home
+    mountPath: /home/tssc
+    description: >-
+      Workspace for the container users home directory.
+  - name: app
+    description: >-
+      Workspace with the checked out application in to use as the
+      working directory for the step execution.
+  params:
+  - name: verbose
+    description: log the commands used during execution
+    type: string
+    default: "false"
+  - name: image
+    type: string
+    description: >-
+      Container image to run the steps of this task in.
+    default: ubi8-minimal
+  # NOTE: See https://github.com/tektoncd/pipeline/issues/3423
+  #- name: imagePullPolicy
+  #  type: string
+  #  description: >-
+  #    Policy for pulling new versions of the given image.
+  #  default: IfNotPresent
+  - name: venvPath
+    type: string
+    description: >-
+      Required.
+      Path to the virtual environment to activate and run this step in the context of.
+  - name: tsscStepName
+    type: string
+    description: >-
+      Required.
+      Name of the TSSC workflow step for the TSSC step runner to run.
+  - name: tsscConfigDir
+    type: string
+    description: >-
+      Required.
+      Path to the TSSC configuration to pass to the TSSC step runner when running the step.
+  - name: tsscEnvironment
+    type: string
+    description: >-
+      Optional.
+      Name of the environment to target when running the given TSSC step.
+
+      This should be equal to one of the environment names used in one or more of the
+      TSSC configuration files in the given TSSC configuration directory.
+    default: ""
+
+  steps:
+  - name: tssc-step
+    image: $(params.image)
+    # NOTE:
+    #   when https://github.com/tektoncd/pipeline/issues/3423 resolved
+    #   replace with $(params.imagePullPolicy)
+    imagePullPolicy: {{ $.Values.imagePullPolicy }}
+    {{- if $.Values.runAsUser }}
+    securityContext:
+      runAsUser: {{ $.Values.runAsUser | int }}
+    {{- end }}
+    env:
+    - name: HOME
+      value: $(workspaces.home.path)
+    - name: VERBOSE
+      value: $(params.verbose)
+    workingDir: $(workspaces.app.path)
+    script: |
+      #!/bin/sh
+      if [ "${VERBOSE}" == "true" ]; then set -x; else set +x; fi
+      set -eu -o pipefail
+
+      # SOURE: https://unix.stackexchange.com/questions/247576/how-to-get-home-given-user
+      # REASONS:
+      #   * https://projects.engineering.redhat.com/browse/NAPSSPO-1057
+      #   * https://github.com/tektoncd/pipeline/blob/master/docs/auth.md#using-ssh-authentication-in-git-type-tasks
+      echo "***************************************************"
+      echo "* Link .ssh for current user to /tekton/home/.ssh *"
+      echo "***************************************************"
+      passwd_home=$(getent passwd $(whoami) | cut -d: -f6)
+      ln -s /tekton/home/.ssh ${passwd_home}/.ssh
+      echo "linked '${passwd_home}/.ssh' to '/tekton/home/.ssh'"
+
+      echo "************"
+      echo "* Run Step *"
+      echo "************"
+      source $(params.venvPath)/bin/activate
+
+      python -m tssc \
+          --config "$(params.tsscConfigDir)" \
+          --step "$(params.tsscStepName)" \
+          --environment "$(params.tsscEnvironment)"

@@ -1,0 +1,18 @@
+Installed Following Cluster level resources:
+* ClusterTriggerBinding
+  - gitea-pullreq
+
+* ClusterTask
+  - import-pgp-keys
+  - tssc-setup-python-venv
+  - tssc-step-runner
+  - pattern-matcher
+    * temporary until https://github.com/tektoncd/pipeline/issues/3468 is resolved
+  - tssc-git-clone
+    * temporary until https://github.com/tektoncd/catalog/issues/562 is resolved
+
+* ClusterRole
+  - {{ include "tssc-workflow-tekton-cluster-resources.sccName" . }}
+
+* SecurityContextConstraints
+  - {{ include "tssc-workflow-tekton-cluster-resources.sccName" . }}
