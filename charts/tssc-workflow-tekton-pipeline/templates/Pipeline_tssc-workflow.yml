@@ -1,0 +1,714 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: {{ include "tssc-workflow.resourcesName" . | quote }}
+  labels:
+    {{- include "tssc-workflow.labels" . | nindent 4 }}
+spec:
+  workspaces:
+  - name: home
+    description: >-
+      Workspace for the container users home directory.
+  - name: app
+    description: >-
+      Workspace to checkout the application this workflow is for and set as the working directory
+      for the step executions.
+  params:
+    - name: verbose
+      description: log any *sh commands used during execution
+      type: string
+      default: "false"
+    - name: appRepoUrl
+      description: >-
+        URL to the application repository to run the pipeline for.
+      type: string
+    - name: appRepoRef
+      description: >-
+        Git reference (tag, branch) of the application repository to run the pipeline for.
+      type: string
+    - name: appCloneSSLVerify
+      description: >-
+        Passed to git-clone ClusterTask.
+        Defines if http.sslVerify should be set to true or false in the global git config
+      type: string
+      default: "true"
+    - name: tsscConfigDir
+      description: >-
+        Path to the TSSC configuration to pass to the TSSC step runner when running the step.
+      type: string
+      default: ''
+    - name: pgpKeysSecretName
+      description: >-
+        Name of the Kubernetes Secret containing the PGP private keys to import for use by SOPS
+        to decrypt encrypted TSSC config.
+      type: string
+    - name: envNameDev
+      type: string
+      description: >-
+        Name of the "Development" environment used in the TSSC configuration files and to pass
+        to the TSSC step runner when running a step targeted to the "Development" environment.
+      default: DEV
+    - name: envNameTest
+      type: string
+      description: >-
+        Name of the "Test" environment used in the TSSC configuration files and to pass
+        to the TSSC step runner when running a step targeted to the "Test" environment.
+      default: TEST
+    - name: envNameProd
+      type: string
+      description: >-
+        Name of the "Production" environment used in the TSSC configuration files and to pass
+        to the TSSC step runner when running a step targeted to the "Production" environment.
+      default: PROD
+    - name: releaseBranchPatterns
+      type: string
+      description: >-
+        Regex pattern for branches that should be deployed to
+        "Test" and then "Production" environments.
+      default: "^main$"
+    - name: devBranchPattern
+      type: string
+      description: >-
+        Regex pattern for branches that should be deployed to
+        "Development" environments.
+      default: "^feature/.+$|^PR-.+$"
+    # NOTE: See https://github.com/tektoncd/pipeline/issues/3423
+    #- name: ciWorkersImagePullPolicy
+    #  type: string
+    #  description: >-
+    #    Policy for pulling new versions of the imageTag for the CI worker images
+    #    when running this pipeline.
+    #  default: IfNotPresent
+    - name: updateTSSCLibrary
+      type: string
+      description: >-
+        If 'true', then pull the TSSC step runner library source code and build it.
+        If 'false', use the version of the TSSC step runner library that is pre-installed
+        in the CI worker images.
+
+        If 'false' then the following parameters are ignored:
+          - 'tsscLibSourceUrl'
+          - 'tsscLibIndexUrl'
+          - 'tsscLibExtraIndexUrl'
+          - 'tsscLibVersion'
+      default: "false"
+    - name: tsscLibIndexUrl
+      type: string
+      description: >-
+        If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+        will be passed to pip as '--index-url' for installing the TSSC step runner library
+        and its dependencies.
+
+        NOTE
+        ----
+        PIP is indeterminate whether it will pull packages from '--index-url' or
+        '--extra-index-url', therefor be sure to specify 'tsscLibVersion'
+        if trying to pull a specific version from a specific index.
+
+        SEE
+        ---
+        - https://pip.pypa.io/en/stable/reference/pip_install/#id48
+      default: "https://pypi.org/simple/"
+    - name: tsscLibExtraIndexUrl
+      type: string
+      description: >-
+        If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+        will be passed to pip as '--extra-index-url' for installing the TSSC step runner library
+        and its dependencies.
+
+        NOTE
+        ----
+        PIP is indeterminate whether it will pull packages from '--index-url' or
+        '--extra-index-url', therefor be sure to specify 'tsscLibVersion'
+        if trying to pull a specific version from a specific index.
+
+        SEE
+        ---
+        - https://pip.pypa.io/en/stable/reference/pip_install/#id48
+      default: "https://pypi.org/simple/"
+    - name: tsscLibVersion
+      type: string
+      description: >-
+        If 'updateTSSCLibrary' is true and 'tsscLibSourceUrl' is not supplied then this
+        will be passed to pip as as the version of the TSSC step runner library to install.
+
+        NOTE
+        ----
+        If not given pip will isntall the latest from either 'tsscLibIndexUrl' or
+        'tsscLibExtraIndexUrl' indeterminantly.
+      default: ""
+    - name: tsscLibSourceUrl
+      type: string
+      description: >-
+        If none empty value given and 'updateTSSCLibrary' is true this will be used as the source
+        location to install the TSSC step runner library from rather then from a PEP 503 compliant
+        repository.
+
+        If given then the following parameters are ignored:
+          - 'tsscLibIndexUrl'
+          - 'tsscLibExtraIndexUrl'
+          - 'tsscLibVersion'
+
+        EXAMPLES
+        --------
+        git+https://github.com/rhtconsulting/tssc-python-package.git@feature/NAPSSPO-1018
+        installs from the public 'rhtconsulting' fork from the 'feature/NAPSSPO-1018' branch.
+
+        git+https://gitea.internal.example.xyz/tools/tssc-python-package.git@main
+        installs from an internal fork of the 'tssc' library from the 'main' branch.
+      default: ""
+
+    - name: ciWorkerImageDefault
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-base:latest
+    - name: ciWorkerImageSourceClone
+      type: string
+      description: >-
+        TODO
+      default: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.12.1
+    - name: ciWorkerImageUnitTest
+      type: string
+      description: >-
+        TODO
+    - name: ciWorkerImagePackage
+      type: string
+      description: >-
+        TODO
+    - name: ciWorkerImageStaticCodeAnalysis
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-sonar:latest
+    - name: ciWorkerImagePushArtifacts
+      type: string
+      description: >-
+        TODO
+    - name: ciWorkerImageContainerOperations
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-containers:latest
+    - name: ciWorkerImageContainerImageStaticComplianceScan
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-openscap:latest
+    - name: ciWorkerImageContainerImageStaticVulnerabilityScan
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-openscap:latest
+    - name: ciWorkerImageDeploy
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-argocd:latest
+    - name: ciWorkerImageValidateEnvironmentConfiguraiton
+      type: string
+      description: >-
+        TODO
+      default: tssc/tssc-tool-config-lint:latest
+    - name: ciWorkerImageUAT
+      type: string
+      description: >-
+        TODO
+
+  tasks:
+  #########
+  # SETUP #
+  #########
+
+  ####################
+  # Setup: App Clone #
+  ####################
+  - name: setup-app-clone
+    taskRef:
+      kind: ClusterTask
+      name: tssc-git-clone
+    workspaces:
+    - name: output
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageSourceClone)
+    - name: url
+      value: $(params.appRepoUrl)
+    - name: revision
+      value: $(params.appRepoRef)
+    - name: deleteExisting
+      value: "true"
+    - name: sslVerify
+      value: $(params.appCloneSSLVerify)
+    # NOTE: this is so that git wont end up in a detached head mode
+    - name: refspec
+      value: "+refs/heads/$(params.appRepoRef):$(params.appRepoRef)"
+
+  ######################
+  # Setup: Python venv #
+  ######################
+  - name: setup-python-venv
+    runAfter:
+    - setup-app-clone
+    taskRef:
+      kind: ClusterTask
+      name: tssc-setup-python-venv
+    workspaces:
+    - name: home
+      workspace: home
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageDefault)
+    - name: updateTSSCLibrary
+      value: $(params.updateTSSCLibrary)
+    - name: tsscLibSourceUrl
+      value: $(params.tsscLibSourceUrl)
+    - name: tsscLibIndexUrl
+      value: $(params.tsscLibIndexUrl)
+    - name: tsscLibExtraIndexUrl
+      value: $(params.tsscLibExtraIndexUrl)
+    - name: tsscLibVersion
+      value: $(params.tsscLibVersion)
+
+  ##########################
+  # Setup: Import PGP Keys #
+  ##########################
+  - name: setup-import-pgp-keys
+    # NOTE:
+    #   this dependency is only here because of read/write once constraints of most PV/PVCs
+    #   if happening to be using storage that supports ReadWriteMany this step and the
+    #   'setup-python-venv' step could be run in parallel
+    runAfter:
+    - setup-python-venv
+    taskRef:
+      kind: ClusterTask
+      name: import-pgp-keys
+    workspaces:
+    - name: home
+      workspace: home
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageDefault)
+    - name: pgpKeysSecretName
+      value: $(params.pgpKeysSecretName)
+
+  #########################
+  # Continues Integration #
+  #########################
+
+  #########################
+  # CI: Generate Metadata #
+  #########################
+  - name: ci-generate-metadata
+    runAfter:
+    - setup-python-venv
+    - setup-import-pgp-keys
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageDefault)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: generate-metadata
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  #######################
+  # CI: Tag Source Code #
+  #######################
+  - name: ci-tag-source-code
+    runAfter:
+    - ci-generate-metadata
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageDefault)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: tag-source
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ######################
+  # CI: Run Unit Tests #
+  ######################
+  - name: ci-run-unit-tests
+    runAfter:
+    - ci-tag-source-code
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageUnitTest)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: unit-test
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ###########################
+  # CI: Package Application #
+  ###########################
+  - name: ci-package-application
+    runAfter:
+    - ci-run-unit-tests
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImagePackage)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: package
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ############################
+  # CI: Static Code Analysis #
+  ############################
+  - name: ci-static-code-analysis
+    runAfter:
+    - ci-package-application
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageStaticCodeAnalysis)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: static-code-analysis
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ####################################
+  # CI: Push Artifacts to Repository #
+  ####################################
+  - name: ci-push-artifacts-to-repository
+    runAfter:
+    - ci-static-code-analysis
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImagePushArtifacts)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: push-artifacts
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ##############################
+  # CI: Create Container Image #
+  ##############################
+  - name: ci-create-container-image
+    runAfter:
+    - ci-push-artifacts-to-repository
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageContainerOperations)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: create-container-image
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  #####################################
+  # CI: Static Image Scan: Compliance #
+  #####################################
+  - name: ci-static-image-scan-compliance
+    runAfter:
+    - ci-create-container-image
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageContainerImageStaticComplianceScan)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: container-image-static-compliance-scan
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ########################################
+  # CI: Static Image Scan: Vulnerability #
+  ########################################
+  - name: ci-static-image-scan-vulnerability
+    runAfter:
+    - ci-create-container-image
+    # NOTE:
+    #   since we need to share the $HOME dir between tasks and Kube and Tekton don't like
+    #   two pods mounting the same PV as ready write, we can't run the vulnerability and compliance
+    #   tasks in parallel.
+    #
+    #   If we ever figure out another way to deal with this or have access to ReadWriteMany PVs
+    #   then we can make this parallel.
+    - ci-static-image-scan-compliance
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageContainerImageStaticVulnerabilityScan)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: container-image-static-vulnerability-scan
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ##################################################
+  # CI: Push Trusted Container Image to Repository #
+  ##################################################
+  - name: ci-push-trusted-container-image-to-repository
+    runAfter:
+    - ci-static-image-scan-vulnerability
+    - ci-static-image-scan-compliance
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageContainerOperations)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: push-container-image
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  ####################################
+  # CI: Sign Trusted Container Image #
+  ####################################
+  - name: ci-sign-trusted-container-image
+    runAfter:
+    - ci-push-trusted-container-image-to-repository
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageContainerOperations)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: sign-container-image
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+
+  #######
+  # DEV #
+  #######
+  - name: dev-stage-gate
+    runAfter:
+      - ci-sign-trusted-container-image
+    taskRef:
+      kind: ClusterTask
+      name: pattern-matcher
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: input
+      value: $(params.appRepoRef)
+    - name: pattern
+      value: $(params.devBranchPattern)
+
+  #####################################
+  # DEV: Deploy or Update Environment #
+  #####################################
+  - name: dev-deploy-or-update-environment
+    runAfter:
+    - dev-stage-gate
+    #when:
+    #- input: "$(tasks.dev-stage-gate.results.matches)"
+    #  operator: in
+    #  values: ["true"]
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageDeploy)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: deploy
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+    - name: tsscEnvironment
+      value: $(params.envNameDev)
+
+  ###########################################
+  # DEV: Validate Environment Configuration #
+  ###########################################
+  - name: dev-validate-environment-configuration
+    runAfter:
+    - dev-deploy-or-update-environment
+    #when:
+    #- input: "$(tasks.dev-stage-gate.results.matches)"
+    #  operator: in
+    #  values: ["true"]
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageValidateEnvironmentConfiguraiton)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: validate-environment-configuration
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+    - name: tsscEnvironment
+      value: $(params.envNameDev)
+
+  ##################################
+  # DEV: Run User Acceptance Tests #
+  ##################################
+  - name: dev-run-user-acceptance-tests
+    runAfter:
+    - dev-validate-environment-configuration
+    #when:
+    #- input: "$(tasks.dev-stage-gate.results.matches)"
+    #  operator: in
+    #  values: ["true"]
+    taskRef:
+      kind: ClusterTask
+      name: tssc-step-runner
+    workspaces:
+    - name: home
+      workspace: home
+    - name: app
+      workspace: app
+    params:
+    - name: verbose
+      value: $(params.verbose)
+    - name: image
+      value: $(params.ciWorkerImageUAT)
+    - name: venvPath
+      value: $(tasks.setup-python-venv.results.venvPath)
+    - name: tsscStepName
+      value: uat
+    - name: tsscConfigDir
+      value: $(params.tsscConfigDir)
+    - name: tsscEnvironment
+      value: $(params.envNameDev)

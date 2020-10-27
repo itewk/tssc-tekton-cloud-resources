@@ -1,0 +1,48 @@
+global:
+  verbose: false
+
+  serviceName:
+  applicationName:
+  eventListenerRouteHost:
+  homeTSSCPVCRequestSize: 1Gi
+
+  cleanupPipelineRunsToKeep: 10
+  cleanupPipelineRunsSchedule: "*/15 * * * *"
+  cleanupPipelineSuccessfulJobHistoryLimit: 5
+  cleanupPipelineFailedJobHistoryLimit: 1
+  cleanupPipelineStartingDeadlineSeconds: 600
+
+  imageRegistryURI: quay.io
+  imageRepositoryName: tssc
+  imageTag: latest
+  updateTSSCLibrary: false
+  tsscLibSourceUrl:
+  tsscLibIndexUrl: https://pypi.org/simple/
+  tsscLibExtraIndexUrl: https://pypi.org/simple/
+  tsscLibVersion:
+
+  homeDirStorageSize: 10Gi
+  appDirStorageSize: 1Gi
+
+  envNameDev: DEV
+  envNameTest: TEST
+  envNameProd: PROD
+
+  pgpKeysSecretNameOverride:
+  pgpKeys: {}
+
+  runAsUser: 1001
+  runAsUserRoleBindingName: tssc-tekton-run-as-user-1001
+
+  ciWorkerImageSourceClone: 'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.12.1'
+  ciWorkerImageDefault: tssc/tssc-base:latest
+  ciWorkerImageUnitTest:
+  ciWorkerImagePackage:
+  ciWorkerImageStaticCodeAnalysis:
+  ciWorkerImagePushArtifacts:
+  ciWorkerImageContainerOperations: tssc/tssc-tool-containers:latest
+  ciWorkerImageContainerImageStaticComplianceScan: tssc/tssc-tool-openscap:latest
+  ciWorkerImageContainerImageStaticVulnerabilityScan: tssc/tssc-tool-openscap:latest
+  ciWorkerImageDeploy: tssc/tssc-tool-argocd:latest
+  ciWorkerImageValidateEnvironmentConfiguraiton: tssc/tssc-tool-config-lint:latest
+  ciWorkerImageUAT:

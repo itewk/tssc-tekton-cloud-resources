@@ -1,0 +1,126 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: {{ include "tssc-workflow.triggerTemplateName" . }}
+  labels:
+    {{- include "tssc-workflow.labels" . | nindent 4 }}
+spec:
+  params:
+  - name: git-repo-url
+  - name: git-repo-ssh-url
+  - name: pullreq-sha
+  - name: pullreq-ref
+  - name: pullreq-action
+  - name: pullreq-number
+  - name: pullreq-repo-full_name
+  - name: pullreq-html-url
+  - name: pullreq-title
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: "{{ include "tssc-workflow.resourcesName" . }}-"
+      labels:
+        tekton.dev/pipeline: {{ include "tssc-workflow.resourcesName" . | quote }}
+        {{- include "tssc-workflow.labels" . | nindent 8 }}
+    spec:
+      pipelineRef:
+        name: {{ include "tssc-workflow.resourcesName" . | quote }}
+      {{- if $.Values.global.runAsUser }}
+      serviceAccountName: {{ include "tssc-workflow.pipelineServiceAccountName" . }}
+      podTemplate:
+        securityContext:
+          runAsUser: {{ $.Values.global.runAsUser }}
+          fsGroup: {{ $.Values.global.runAsUser }}
+      taskRunSpecs:
+      - pipelineTaskName: setup-app-clone
+        taskServiceAccountName: {{ include "tssc-workflow.pipelineServiceAccountName" . }}
+        taskPodTemplate: {}
+      {{- end }}
+
+      resources: []
+      workspaces:
+      - name: home
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ $.Values.global.homeDirStorageSize | quote }}
+      - name: app
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ $.Values.global.appDirStorageSize | quote }}
+      params:
+      {{- if ($.Values.global.verbose | quote) }}
+      - name: verbose
+        value: {{ $.Values.global.verbose | quote }}
+      {{- end }}
+      - name: appRepoUrl
+        value: $(tt.params.git-repo-ssh-url)
+      - name: appRepoRef
+        value: $(tt.params.pullreq-ref)
+      {{- if ($.Values.global.appCloneSSLVerify | quote) }}
+      - name: appCloneSSLVerify
+        value: {{ $.Values.global.appCloneSSLVerify | quote }}
+      {{- end }}
+      - name: tsscConfigDir
+        value: {{ (required "Global Value is required: tsscConfigDir" $.Values.global.tsscConfigDir) | quote }}
+      - name: pgpKeysSecretName
+        value: {{ include "tssc-workflow.pgpKeysSecretName" . | quote }}
+      {{- if $.Values.global.updateTSSCLibrary | quote }}
+      - name: updateTSSCLibrary
+        value: {{ $.Values.global.updateTSSCLibrary | quote }}
+      {{- end }}
+      {{- if $.Values.global.tsscLibIndexUrl }}
+      - name: tsscLibIndexUrl
+        value: {{ $.Values.global.tsscLibIndexUrl | quote }}
+      {{- end }}
+      {{- if $.Values.global.tsscLibExtraIndexUrl }}
+      - name: tsscLibExtraIndexUrl
+        value: {{ $.Values.global.tsscLibExtraIndexUrl | quote }}
+      {{- end }}
+      {{- if $.Values.global.tsscLibVersion }}
+      - name:  tsscLibVersion
+        value: {{ $.Values.global.tsscLibVersion | quote }}
+      {{- end }}
+      {{- if $.Values.global.tsscLibSourceUrl }}
+      - name: tsscLibSourceUrl
+        value: {{ $.Values.global.tsscLibSourceUrl | quote }}
+      {{- end }}
+      - name: envNameDev
+        value: {{ $.Values.global.envNameDev | quote }}
+      - name: envNameTest
+        value: {{ $.Values.global.envNameTest | quote }}
+      - name: envNameProd
+        value: {{ $.Values.global.envNameProd | quote }}
+      - name: ciWorkerImageDefault
+        value: {{ (required "Global Value is required: ciWorkerImageDefault" $.Values.global.ciWorkerImageDefault) | quote }}
+      - name: ciWorkerImageSourceClone
+        value: {{ (required "Global Value is required: ciWorkerImageSourceClone" $.Values.global.ciWorkerImageSourceClone) | quote }}
+      - name: ciWorkerImageUnitTest
+        value: {{ (required "Global Value is required: ciWorkerImageUnitTest" $.Values.global.ciWorkerImageUnitTest) | quote }}
+      - name: ciWorkerImagePackage
+        value: {{ (required "Global Value is required: ciWorkerImagePackage" $.Values.global.ciWorkerImagePackage) | quote }}
+      - name: ciWorkerImageStaticCodeAnalysis
+        value: {{ (required "Global Value is required: ciWorkerImageStaticCodeAnalysis" $.Values.global.ciWorkerImageStaticCodeAnalysis) | quote }}
+      - name: ciWorkerImagePushArtifacts
+        value: {{ (required "Global Value is required: ciWorkerImagePushArtifacts" $.Values.global.ciWorkerImagePushArtifacts) | quote }}
+      - name: ciWorkerImageContainerOperations
+        value: {{ (required "Global Value is required: ciWorkerImageContainerOperations" $.Values.global.ciWorkerImageContainerOperations) | quote }}
+      - name: ciWorkerImageContainerImageStaticComplianceScan
+        value: {{ (required "Global Value is required: ciWorkerImageContainerImageStaticComplianceScan" $.Values.global.ciWorkerImageContainerImageStaticComplianceScan) | quote }}
+      - name: ciWorkerImageContainerImageStaticVulnerabilityScan
+        value: {{ (required "Global Value is required: ciWorkerImageContainerImageStaticVulnerabilityScan" $.Values.global.ciWorkerImageContainerImageStaticVulnerabilityScan) | quote }}
+      - name: ciWorkerImageDeploy
+        value: {{ (required "Global Value is required: ciWorkerImageDeploy" $.Values.global.ciWorkerImageDeploy) | quote }}
+      - name: ciWorkerImageValidateEnvironmentConfiguraiton
+        value: {{ (required "Global Value is required: ciWorkerImageValidateEnvironmentConfiguraiton" $.Values.global.ciWorkerImageValidateEnvironmentConfiguraiton) | quote }}
+      - name: ciWorkerImageUAT
+        value: {{ (required "Global Value is required: ciWorkerImageUAT" $.Values.global.ciWorkerImageUAT) | quote }}

@@ -1,0 +1,58 @@
+{{- define "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" -}}
+{{- printf "helm-test-el-route-admitted-%s" (include "tssc-workflow-tekton-shared-resources.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+  labels:
+    {{- include "tssc-workflow.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  serviceAccountName: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+  automountServiceAccountToken: true
+  containers:
+  - name: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+    image: quay.io/tssc/tssc-base:latest
+    command:
+    - /bin/bash
+    - -ec
+    - |
+      EL_ROUTE_HOST=$(oc get route {{ include "tssc-workflow.eventListenerRouteName" .}} --namespace {{ .Release.Namespace }} -o jsonpath="{.status.ingress[*].host}")
+      EL_ROUTE_STATUS=$(oc get route {{ include "tssc-workflow.eventListenerRouteName" .}} --namespace {{ .Release.Namespace }} -o jsonpath="{.status.ingress[*].conditions[?(@.type=='Admitted')].status}")
+      EL_ROUTE_REASON=$(oc get route {{ include "tssc-workflow.eventListenerRouteName" .}} --namespace {{ .Release.Namespace }} -o jsonpath="{.status.ingress[*].conditions[?(@.type=='Admitted')].reason}")
+      EL_ROUTE_MESSAGE=$(oc get route {{ include "tssc-workflow.eventListenerRouteName" .}} --namespace {{ .Release.Namespace }} -o jsonpath="{.status.ingress[*].conditions[?(@.type=='Admitted')].message}")
+      echo "Route Name: {{ include "tssc-workflow.eventListenerRouteName" .}}"
+      echo "Route Host: https://${EL_ROUTE_HOST}"
+      echo "Route Admitted:"
+      echo "    Status: ${EL_ROUTE_STATUS}"
+      echo "    Reason: ${EL_ROUTE_REASON}"
+      echo "    Message: ${EL_ROUTE_MESSAGE}"
+
+      [[ ${EL_ROUTE_STATUS} == "True" ]]
+  restartPolicy: Never
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+  labels:
+    {{- include "tssc-workflow.labels" . | nindent 4 }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- kind: ServiceAccount
+  name: {{ include "tssc-workflow-tekton-shared-resources.helmTestELRouteAdmittedResourcesName" . }}
+  namespace: {{ .Release.Namespace }}
