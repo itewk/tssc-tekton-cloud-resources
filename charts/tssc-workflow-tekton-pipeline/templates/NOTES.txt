@@ -1,0 +1,17 @@
+NEXT STEPS:
+
+1. !!IMPORTANT!! Test that the chart installed successfully. This is important to ensure all routes have been admitted.
+    helm test {{ .Chart.Name }}
+
+2. Get the EventListner Route:
+    export EL_ROUTE=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.host}" route {{ include "tssc-workflow.eventListenerRouteName" . }})
+    echo
+    echo "EventListener Route:"
+    echo "    https://${EL_ROUTE}"
+    echo
+
+3. Configure your applications source control repository with a Webhook to the EventListener Route.
+
+LEARN MORE:
+    helm status {{ .Release.Name }}
+    helm get all {{ .Release.Name }}
