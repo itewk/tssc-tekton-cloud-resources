@@ -1,0 +1,2 @@
+tssc-tekton-pipeline:
+  nameOverride: tssc-workflow-tekton-pipeline

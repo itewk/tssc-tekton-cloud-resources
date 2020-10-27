@@ -1,0 +1,17 @@
+apiVersion: v2
+name: tssc-workflow-tekton-shared-resources
+description: >-
+  A Helm chart for Kubernetes to install the shared Tekon resources for a TSSC workflow
+  run by Tekton for a given application service.
+
+  Not intended to be used on its own but rather as a sub chart for a specific workflow/pipeline.
+
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# TSSC workflow version
+appVersion: 0.13.0
