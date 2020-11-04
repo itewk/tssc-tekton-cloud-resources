@@ -1,0 +1,38 @@
+apiVersion: v1
+entries:
+  tssc-workflow-tekton-cluster-resources:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T23:08:46.491636829Z"
+    description: A Helm chart for Kubernetes to deploy the cluster level resources required to deploy and run TSSC reference workflows using Tekton.
+    digest: 55dcfdb2a222a57a5fa324db28062f2c364b2ebff9d7b29238cbfbdcdafece06
+    name: tssc-workflow-tekton-cluster-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/edge/tssc-workflow-tekton-cluster-resources-0.1.0-edge.6/tssc-workflow-tekton-cluster-resources-0.1.0-edge.6.tgz
+    version: 0.1.0-edge.6
+  tssc-workflow-tekton-pipeline:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T23:08:46.614398278Z"
+    description: A Helm chart for Kubernetes to install the TSSC workflow run by Tekton for a given application service.
+    digest: b79e1eae06db121c393539b13dde25d111de127f230f81625dcfa2e277f0aba5
+    name: tssc-workflow-tekton-pipeline
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/edge/tssc-workflow-tekton-pipeline-0.1.0-edge.6/tssc-workflow-tekton-pipeline-0.1.0-edge.6.tgz
+    version: 0.1.0-edge.6
+  tssc-workflow-tekton-shared-resources:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T23:08:46.720740334Z"
+    description: |-
+      A Helm chart for Kubernetes to install the shared Tekon resources for a TSSC workflow run by Tekton for a given application service.
+      Not intended to be used on its own but rather as a sub chart for a specific workflow/pipeline.
+    digest: 39bcceac93fd69417ae9f710feffaaf2bebce52c9edde715f87084c94572db00
+    name: tssc-workflow-tekton-shared-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/edge/tssc-workflow-tekton-shared-resources-0.1.0-edge.6/tssc-workflow-tekton-shared-resources-0.1.0-edge.6.tgz
+    version: 0.1.0-edge.6
+generated: "2020-11-04T23:08:46.396990568Z"
