@@ -4,23 +4,126 @@ name: Release Helm Charts
 on:
   push:
     branches:
-      - main
+    - main
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      helm-charts: ${{ steps.helm-charts.outputs.helm-charts }}
+      semver-pre-release: ${{ steps.semver-pre-release.outputs.semver-pre-release }}
+      semver-build: ${{ steps.semver-build.outputs.semver-build }}
+    steps:
+    - name: Checkout 🛎️
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Determine Helm Charts to release ⚙️
+      id: helm-charts
+      run: |
+        HELM_CHARTS=$(python -c 'import os, json; print json.dumps(os.listdir("charts/"))')
+        echo "::set-output name=helm-charts::${HELM_CHARTS}"
+
+    - name: Determine SemVer pre-release ⚙️
+      id: semver-pre-release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        LAST_TAG_COMMIT=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+        if [[ ${LAST_TAG_COMMIT} ]]; then
+          COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG_COMMIT}..HEAD --count)
+        else
+          COMMITS_SINCE_TAG=$(git rev-list HEAD --count)
+        fi
+
+        SEMVER_PRE_RELEASE="edge${COMMITS_SINCE_TAG}"
+
+        echo "::set-output name=semver-pre-release::${SEMVER_PRE_RELEASE}"
+
+    - name: Determine SemVer build ⚙️
+      id: semver-build
+      run: |
+        SEMVER_BUILD="SHA-${GITHUB_SHA::8}"
+        echo "::set-output name=semver-build::${SEMVER_BUILD}"
+
+  prepare-for-release:
+    runs-on: ubuntu-latest
+    needs:
+    - setup
+    strategy:
+      matrix:
+        helm-chart: ${{fromJson(needs.setup.outputs.helm-charts)}}
+    steps:
+    - name: Checkout 🛎️
+      uses: actions/checkout@v2
+
+    - name: Read Helm Chart 📒
+      id: helm-chart-info
+      uses: jacobtomlinson/gha-read-helm-chart@master
+      with:
+        path: charts/${{ matrix.helm-chart }}
+
+    - name: Determine Helm Chart version ⚙️
+      id: helm-chart-version
+      run: |
+        VERSION="${{ steps.helm-chart-info.outputs.version }}"
+        PRE_RELEASE="${{needs.setup.outputs.semver-pre-release}}"
+        BUILD="${{needs.setup.outputs.semver-build}}"
+
+        # if set append pre-release to SemVer
+        if [[ ${PRE_RELEASE} ]]; then
+          VERSION="${VERSION}-${PRE_RELEASE}"
+        fi
+
+        # NOTE:
+        #   Commented out due to https://github.com/helm/chart-releaser-action/issues/56
+        # if set append build to SemVer
+        #if [[ ${BUILD} ]]; then
+        #  VERSION="${VERSION}+${BUILD}"
+        #fi
+
+        echo "::set-output name=version::${VERSION}"
+
+    - name: Update Helm Chart version 🖋
+      uses: microsoft/variable-substitution@v1
+      with:
+        files: 'charts/${{ matrix.helm-chart }}/Chart.yaml'
+      env:
+        version: ${{steps.helm-chart-version.outputs.version}}
+
+    - name: Upload Helm Chart prepared for release 🔺
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.helm-chart }}
+        path: charts/${{ matrix.helm-chart }}
+
   release:
     runs-on: ubuntu-latest
+    needs:
+    - prepare-for-release
     steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+    - name: Checkout 🛎️
+      uses: actions/checkout@v2
 
-      - name: Configure Git 🛠
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+    # NOTE:
+    #   while it would be nice to download these to different directory like `release-charts`
+    #   the chart-releaser-action thinks there are no changes to publish when the target charts_dir
+    #   isn't in the git history
+    - name: Download Helm Charts prepared to release 🔻
+      id: download-helm-charts
+      uses: actions/download-artifact@v2
+      with:
+        path: charts
 
-      - name: Run chart-releaser 🚀
-        uses: helm/chart-releaser-action@v1.0.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    - name: Configure Git 🛠
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+    - name: Run chart-releaser 🚀
+      uses: helm/chart-releaser-action@v1.0.0
+      env:
+        CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      with:
+        charts_dir: ${{steps.download-helm-charts.outputs.download-path}}
