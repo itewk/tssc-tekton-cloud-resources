@@ -161,9 +161,9 @@ jobs:
         version: v3.4.0
 
     - name: Run chart-releaser 🚀
-      uses: helm/chart-releaser-action@v1.0.0
+      uses: itewk/chart-releaser-action@master
       env:
         CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       with:
         charts_dir: ${{steps.download-helm-charts.outputs.download-path}}
-        #release_name_template: ${{needs.setup.outputs.release-name-template}}
+        release_name_template: ${{needs.setup.outputs.release-name-template}}
