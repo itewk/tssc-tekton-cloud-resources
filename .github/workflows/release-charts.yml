@@ -56,10 +56,10 @@ jobs:
       id: semver-pre-release
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        LAST_TAG_COMMIT=$(git describe --tags --abbrev=0 --match="release/*" 2>/dev/null || echo "")
+        LAST_RELEASE_TAG_COMMIT=$(git describe --tags --abbrev=0 --match="release/*" 2>/dev/null || echo "")
 
-        if [[ ${LAST_TAG_COMMIT} ]]; then
-          COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG_COMMIT}..HEAD --count)
+        if [[ ${LAST_RELEASE_TAG_COMMIT} ]]; then
+          COMMITS_SINCE_TAG=$(git rev-list ${LAST_RELEASE_TAG_COMMIT}..HEAD --count)
         else
           COMMITS_SINCE_TAG=$(git rev-list HEAD --count)
         fi
@@ -150,6 +150,11 @@ jobs:
       run: |
         git config user.name "$GITHUB_ACTOR"
         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+    - name: Install Helm 🛠
+      uses: azure/setup-helm@v1
+      with:
+        version: v3.4.0
 
     - name: Run chart-releaser 🚀
       uses: itewk/chart-releaser-action@master
