@@ -161,5 +161,6 @@ jobs:
       env:
         CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       with:
+        version: 1.0.0
         charts_dir: ${{steps.download-helm-charts.outputs.download-path}}
         release_name_template: ${{needs.setup.outputs.release-name-template}}
