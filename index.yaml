@@ -1,6 +1,42 @@
 apiVersion: v1
 entries:
+  tssc-workflow-tekton-cluster-resources:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T22:35:12.459312675Z"
+    description: A Helm chart for Kubernetes to deploy the cluster level resources
+      required to deploy and run TSSC reference workflows using Tekton.
+    digest: bbb36003af579d79469788b1664a8ba7cf8e9150a47e5876c090515ece636c02
+    name: tssc-workflow-tekton-cluster-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-cluster-resources-0.1.0-edge.16/tssc-workflow-tekton-cluster-resources-0.1.0-edge.16.tgz
+    version: 0.1.0-edge.16
+  tssc-workflow-tekton-pipeline:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T22:35:12.584632649Z"
+    description: A Helm chart for Kubernetes to install the TSSC workflow run by Tekton
+      for a given application service.
+    digest: 5f70ffc7e015e320cb965036e2520d6f773c1f53fd0afb3100f9b51f0694567c
+    name: tssc-workflow-tekton-pipeline
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-pipeline-0.1.0-edge.16/tssc-workflow-tekton-pipeline-0.1.0-edge.16.tgz
+    version: 0.1.0-edge.16
   tssc-workflow-tekton-shared-resources:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T22:35:12.703417582Z"
+    description: |-
+      A Helm chart for Kubernetes to install the shared Tekon resources for a TSSC workflow run by Tekton for a given application service.
+      Not intended to be used on its own but rather as a sub chart for a specific workflow/pipeline.
+    digest: 74c171a8f6feda8b92a90e76c694db21b4570129a8b23f13b7b855f21f8dae75
+    name: tssc-workflow-tekton-shared-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-shared-resources-0.1.0-edge.16/tssc-workflow-tekton-shared-resources-0.1.0-edge.16.tgz
+    version: 0.1.0-edge.16
   - apiVersion: v2
     appVersion: 0.13.0
     created: "2020-11-04T22:29:45.91178221Z"
