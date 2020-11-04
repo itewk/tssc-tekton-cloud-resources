@@ -3,6 +3,8 @@ name: tssc-workflow-tekton-pipeline
 description: >-
   A Helm chart for Kubernetes to install the TSSC workflow run by Tekton for a
   given application service.
+
+  hello world
 type: application
 
 # This is the chart version. This version number should be incremented each time you make changes
