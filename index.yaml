@@ -1,0 +1,15 @@
+apiVersion: v1
+entries:
+  tssc-workflow-tekton-pipeline:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T19:51:59.624630615Z"
+    description: A Helm chart for Kubernetes to install the TSSC workflow run by Tekton
+      for a given application service.
+    digest: 653e4c716c02729cf188a77062f6193ae33feef0ea01a5f91472410e9517b3f9
+    name: tssc-workflow-tekton-pipeline
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-pipeline-0.1.0-edge8/tssc-workflow-tekton-pipeline-0.1.0-edge8.tgz
+    version: 0.1.0-edge8
+generated: "2020-11-04T19:51:59.509687881Z"
