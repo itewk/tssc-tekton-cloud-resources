@@ -6,6 +6,7 @@ description: >-
 
   Not intended to be used on its own but rather as a sub chart for a specific workflow/pipeline.
 
+  foo
 type: application
 
 # This is the chart version. This version number should be incremented each time you make changes

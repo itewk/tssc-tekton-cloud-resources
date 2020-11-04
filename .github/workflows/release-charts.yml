@@ -151,7 +151,7 @@ jobs:
         git config user.name "$GITHUB_ACTOR"
         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-    - name: Install Helm 🛠
+    - name: Install Helm 🧰
       uses: azure/setup-helm@v1
       with:
         version: v3.4.0
@@ -162,4 +162,4 @@ jobs:
         CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       with:
         charts_dir: ${{steps.download-helm-charts.outputs.download-path}}
-        release_name_template: "${{needs.setup.outputs.release-name-template}}"
+        release_name_template: ${{needs.setup.outputs.release-name-template}}
