@@ -27,28 +27,6 @@ jobs:
         HELM_CHARTS=$(python -c 'import os, json; print json.dumps(os.listdir("charts/"))')
         echo "::set-output name=helm-charts::${HELM_CHARTS}"
 
-    - name: Determine SemVer pre-release ⚙️
-      id: semver-pre-release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: |
-        LAST_TAG_COMMIT=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
-        if [[ ${LAST_TAG_COMMIT} ]]; then
-          COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG_COMMIT}..HEAD --count)
-        else
-          COMMITS_SINCE_TAG=$(git rev-list HEAD --count)
-        fi
-
-        SEMVER_PRE_RELEASE="edge.${COMMITS_SINCE_TAG}"
-
-        echo "::set-output name=semver-pre-release::${SEMVER_PRE_RELEASE}"
-
-    - name: Determine SemVer build ⚙️
-      id: semver-build
-      run: |
-        SEMVER_BUILD="SHA-${GITHUB_SHA::8}"
-        echo "::set-output name=semver-build::${SEMVER_BUILD}"
-
     - name: Determine release name template
       id: release-name-template
       run: |
@@ -66,12 +44,35 @@ jobs:
           exit 1
         fi
 
-        # export the release name template
+        # create the release name template
         # SEE:
         #   * https://github.com/helm/chart-releaser#create-github-releases-from-helm-chart-packages
         #   * https://github.com/helm/chart-releaser#create-the-repository-index-from-github-releases
         RELEASE_NAME_TEMPALTE="${RELEASE_NAME_TEMPALTE_PREFIX}/{{ .Name }}-{{ .Version }}"
+
         echo "::set-output name=release-name-template::${RELEASE_NAME_TEMPALTE}"
+
+    - name: Determine SemVer pre-release ⚙️
+      id: semver-pre-release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        LAST_TAG_COMMIT=$(git describe --tags --abbrev=0 --match="release/*" 2>/dev/null || echo "")
+
+        if [[ ${LAST_TAG_COMMIT} ]]; then
+          COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG_COMMIT}..HEAD --count)
+        else
+          COMMITS_SINCE_TAG=$(git rev-list HEAD --count)
+        fi
+
+        SEMVER_PRE_RELEASE="edge.${COMMITS_SINCE_TAG}"
+
+        echo "::set-output name=semver-pre-release::${SEMVER_PRE_RELEASE}"
+
+    - name: Determine SemVer build ⚙️
+      id: semver-build
+      run: |
+        SEMVER_BUILD="SHA-${GITHUB_SHA::8}"
+        echo "::set-output name=semver-build::${SEMVER_BUILD}"
 
   prepare-for-release:
     runs-on: ubuntu-latest
