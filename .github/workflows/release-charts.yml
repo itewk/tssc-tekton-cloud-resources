@@ -14,6 +14,7 @@ jobs:
       helm-charts: ${{ steps.helm-charts.outputs.helm-charts }}
       semver-pre-release: ${{ steps.semver-pre-release.outputs.semver-pre-release }}
       semver-build: ${{ steps.semver-build.outputs.semver-build }}
+      release-name-template: ${{ steps.release-name-template.outputs.release-name-template }}
     steps:
     - name: Checkout 🛎️
       uses: actions/checkout@v2
@@ -38,7 +39,7 @@ jobs:
           COMMITS_SINCE_TAG=$(git rev-list HEAD --count)
         fi
 
-        SEMVER_PRE_RELEASE="edge${COMMITS_SINCE_TAG}"
+        SEMVER_PRE_RELEASE="edge.${COMMITS_SINCE_TAG}"
 
         echo "::set-output name=semver-pre-release::${SEMVER_PRE_RELEASE}"
 
@@ -47,6 +48,30 @@ jobs:
       run: |
         SEMVER_BUILD="SHA-${GITHUB_SHA::8}"
         echo "::set-output name=semver-build::${SEMVER_BUILD}"
+
+    - name: Determine release name template
+      id: release-name-template
+      run: |
+        # determine the release name template prefix based on branch name
+        #   if GITHUB_REF is the default branch: edge
+        #   if GITHUB_REF is a different branch: {branch_name}
+        RELEASE_NAME_TEMPALTE_PREFIX=""
+        if [[ $GITHUB_REF == refs/heads/* ]]; then
+          RELEASE_NAME_TEMPALTE_PREFIX=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          if [ "${{ github.event.repository.default_branch }}" = "${RELEASE_NAME_TEMPALTE_PREFIX}" ]; then
+            RELEASE_NAME_TEMPALTE_PREFIX=edge
+          fi
+        else
+          echo "This script doesn't currently no how to handle anything but branches"
+          exit 1
+        fi
+
+        # export the release name template
+        # SEE:
+        #   * https://github.com/helm/chart-releaser#create-github-releases-from-helm-chart-packages
+        #   * https://github.com/helm/chart-releaser#create-the-repository-index-from-github-releases
+        RELEASE_NAME_TEMPALTE="${RELEASE_NAME_TEMPALTE_PREFIX}/{{ .Name }}-{{ .Version }}"
+        echo "::set-output name=release-name-template::${RELEASE_NAME_TEMPALTE}"
 
   prepare-for-release:
     runs-on: ubuntu-latest
@@ -102,10 +127,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs:
+    - setup
     - prepare-for-release
     steps:
     - name: Checkout 🛎️
       uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
 
     # NOTE:
     #   while it would be nice to download these to different directory like `release-charts`
@@ -123,8 +151,9 @@ jobs:
         git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
     - name: Run chart-releaser 🚀
-      uses: helm/chart-releaser-action@v1.0.0
+      uses: itewk/chart-releaser-action@master
       env:
         CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
       with:
         charts_dir: ${{steps.download-helm-charts.outputs.download-path}}
+        release_name_template: "${{needs.setup.outputs.release-name-template}}"
