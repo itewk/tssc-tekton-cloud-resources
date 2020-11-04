@@ -12,6 +12,17 @@ entries:
     urls:
     - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-cluster-resources-0.1.0-edge8/tssc-workflow-tekton-cluster-resources-0.1.0-edge8.tgz
     version: 0.1.0-edge8
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T20:39:23.315329861Z"
+    description: A Helm chart for Kubernetes to deploy the cluster level resources
+      required to deploy and run TSSC reference workflows using Tekton.
+    digest: 0c8f4ffca495f47fad9f77b2c95aa34393fabc25ee4143c3cf65c9b0e10a713c
+    name: tssc-workflow-tekton-cluster-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-cluster-resources-0.1.0-edge1/tssc-workflow-tekton-cluster-resources-0.1.0-edge1.tgz
+    version: 0.1.0-edge1
   tssc-workflow-tekton-pipeline:
   - apiVersion: v2
     appVersion: 0.13.0
@@ -35,6 +46,17 @@ entries:
     urls:
     - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-pipeline-0.1.0-edge8/tssc-workflow-tekton-pipeline-0.1.0-edge8.tgz
     version: 0.1.0-edge8
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T20:39:23.575175224Z"
+    description: A Helm chart for Kubernetes to install the TSSC workflow run by Tekton
+      for a given application service.
+    digest: 852fb858130777116f7a548b6a4f80cecdc19f165d01a2438afcf564ccb987a2
+    name: tssc-workflow-tekton-pipeline
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-pipeline-0.1.0-edge1/tssc-workflow-tekton-pipeline-0.1.0-edge1.tgz
+    version: 0.1.0-edge1
   tssc-workflow-tekton-shared-resources:
   - apiVersion: v2
     appVersion: 0.13.0
@@ -48,4 +70,16 @@ entries:
     urls:
     - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-shared-resources-0.1.0-edge8/tssc-workflow-tekton-shared-resources-0.1.0-edge8.tgz
     version: 0.1.0-edge8
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2020-11-04T20:39:23.856520217Z"
+    description: |-
+      A Helm chart for Kubernetes to install the shared Tekon resources for a TSSC workflow run by Tekton for a given application service.
+      Not intended to be used on its own but rather as a sub chart for a specific workflow/pipeline.
+    digest: 3f47baeb79f7535e8c7bca1ac648c7afd26b4f7df5f83c5c8246dddcfe957537
+    name: tssc-workflow-tekton-shared-resources
+    type: application
+    urls:
+    - https://github.com/itewk/tssc-tekton-cloud-resources/releases/download/tssc-workflow-tekton-shared-resources-0.1.0-edge1/tssc-workflow-tekton-shared-resources-0.1.0-edge1.tgz
+    version: 0.1.0-edge1
 generated: "2020-11-04T19:51:59.509687881Z"
